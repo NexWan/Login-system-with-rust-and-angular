@@ -1,11 +1,13 @@
 mod db;
 
-use actix_web::{get, post, web, App, HttpServer, Responder};
+use std::ptr::null;
+use actix_web::{get, post, web, App, HttpServer, Responder, Error};
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use actix_cors::Cors;
-use serde::de::Error;
 use sqlx::{Executor, Row};
+use actix_session::{Session, SessionMiddleware, storage::{CookieSessionStore}};
+use actix_web::cookie::Key;
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -23,7 +25,7 @@ async fn manual_hello() -> impl Responder {
 }
 
 #[post("/api/login")]
-async fn get_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Error> {
+async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Responder, actix_web::Error> {
     let username = user.username.lock().unwrap().clone();
     let password = user.password.lock().unwrap().clone();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
@@ -38,17 +40,19 @@ async fn get_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Er
             status: "error".to_string(),
             message: "User not found".to_string(),
         };
+        session.insert("user", "")?;
         return Ok(web::Json(confirm))
     }
     let confirm = Response {
         status: "success".to_string(),
         message: "User found".to_string(),
     };
+    session.insert("user", &username)?;
     Ok(web::Json(confirm))
 }
 
 #[post("/api/add_user")]
-async fn add_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Error> {
+async fn add_user(user: web::Json<User>, session:Session) -> Result<impl Responder, actix_web::Error> {
     let username = user.username.lock().unwrap().clone();
     let password = user.password.lock().unwrap().clone();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
@@ -65,6 +69,35 @@ async fn add_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Er
     Ok(web::Json(confirm))
 }
 
+#[get("/api/verify_session")]
+async fn verify_session(session: Session) -> Result<impl Responder, actix_web::Error> {
+    let user = session.get::<String>("user")?;
+    match user {  //This is used to check if the user is in the session
+        Some(user) => {
+            Ok(web::Json(Response {
+                status: "success".to_string(),
+                message: user,
+            }))
+        }
+        None => {
+            Ok(web::Json(Response {
+                status: "error".to_string(),
+                message: "No user found".to_string(),
+            }))
+        }
+    }
+}
+
+//This is used to logout the user from the session
+#[get("/api/logout")]
+async fn logout(session: Session) -> Result<impl Responder, actix_web::Error> {
+    session.remove("user");
+    Ok(web::Json(Response {
+        status: "success".to_string(),
+        message: "User logged out".to_string(),
+    }))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
@@ -75,7 +108,14 @@ async fn main() -> std::io::Result<()> {
             .route("/hey", web::get().to(manual_hello))
             .service(get_user)
             .service(add_user)
+            .service(verify_session)
+            .service(logout)
             .wrap(cors) // Wraps the cors around the app
+            .wrap(
+                SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+                    .cookie_secure(false)
+                    .build()
+            ) //This is used to create a session for the user
     })
     .bind(("127.0.0.1", 8080))?
         .run()
