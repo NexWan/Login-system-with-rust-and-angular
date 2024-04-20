@@ -22,10 +22,10 @@ async fn manual_hello() -> impl Responder {
     format!("{}", count[0].get::<i64, usize>(0)) //If this returns the amount of data into the table, then the connection is working
 }
 
-#[post("/api/get_user")]
+#[post("/api/login")]
 async fn get_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Error> {
-    let username = user.name.lock().unwrap().clone();
-    let password = user.pwd.lock().unwrap().clone();
+    let username = user.username.lock().unwrap().clone();
+    let password = user.password.lock().unwrap().clone();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     let mut rows = sqlx::query("SELECT * FROM test_table WHERE username = $1 AND password = $2")
         .bind(&username)
@@ -49,8 +49,8 @@ async fn get_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Er
 
 #[post("/api/add_user")]
 async fn add_user(user: web::Json<User>) -> Result<impl Responder, actix_web::Error> {
-    let username = user.name.lock().unwrap().clone();
-    let password = user.pwd.lock().unwrap().clone();
+    let username = user.username.lock().unwrap().clone();
+    let password = user.password.lock().unwrap().clone();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     let mut rows = sqlx::query("INSERT INTO test_table (username, password) VALUES ($1, $2)")
         .bind(&username)
@@ -85,8 +85,8 @@ async fn main() -> std::io::Result<()> {
 //This struct is used to create a USER type which deserialize the JSON data coming from the front end
 #[derive(Deserialize, Debug)]
 struct User {
-    name: Mutex<String>,
-    pwd: Mutex<String>,
+    username: Mutex<String>,
+    password: Mutex<String>,
 }
 
 #[derive(Serialize, Debug)]

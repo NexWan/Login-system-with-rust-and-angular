@@ -10,3 +10,4 @@ actix-web = "4"
 serde = { version = "1.0.198", features = ["derive"] }
 actix-cors = "0.7.0"
 sqlx = { version = "0.7", features = [ "runtime-tokio", "tls-native-tls", "postgres" ] }
+dotenv = "0.15.0"
