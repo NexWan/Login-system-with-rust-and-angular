@@ -22,8 +22,9 @@ password: any;
     res.subscribe((data)=>{
       if(data.status == 'success'){ //We get the status of the response of the backend server
         this.router.navigate(['home']); // If the status is success we redirect to the home page
+        sessionStorage.setItem('user', this.user); // We save the user in the session storage
       }else{
-        alert(data.message);
+        alert(data.message); // If the status is not success we show the message of the response
       }
     });
     console.log(this.user, this.password);

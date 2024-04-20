@@ -1,7 +1,9 @@
+use std::path::PathBuf;
 use actix_web::{get, post, web, Responder, Error};
 use sqlx::{Row};
 use actix_session::{Session};
 use crate::{db, types::{User, Response}};
+use actix_files::NamedFile;
 
 
 #[get("/")]
@@ -91,4 +93,9 @@ pub async fn logout(session: Session) -> Result<impl Responder, Error> {
         status: "success".to_string(),
         message: "User logged out".to_string(),
     }))
+}
+
+pub async fn not_found() -> Result<NamedFile, Error> {
+    let path:PathBuf = "static/404.html".parse().unwrap();
+    Ok(NamedFile::open(path)?)
 }

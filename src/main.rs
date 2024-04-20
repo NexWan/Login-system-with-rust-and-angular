@@ -2,8 +2,7 @@ mod db;
 mod controller;
 mod types;
 
-use actix_web::{web, App, HttpServer, Responder};
-use serde::{Deserialize, Serialize};
+use actix_web::{web, App, HttpServer};
 use actix_cors::Cors;
 use actix_session::{SessionMiddleware, storage::{CookieSessionStore}};
 use actix_web::cookie::Key;
@@ -26,6 +25,7 @@ async fn main() -> std::io::Result<()> {
                     .cookie_secure(false)
                     .build()
             ) //This is used to create a session for the user
+            .default_service(web::route().to(|| controller::not_found()))
     })
     .bind(("127.0.0.1", 8080))?
         .run()

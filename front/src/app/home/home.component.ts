@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ConfigService } from '../config.service';
 
 @Component({
   selector: 'app-home',
@@ -7,6 +9,19 @@ import { Component } from '@angular/core';
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
+
+  constructor(private route: ActivatedRoute, private router: Router, private config: ConfigService) { }
+
+  ngOnInit(): void {
+    console.log(sessionStorage.getItem('user'));
+    
+    if(sessionStorage.getItem('user') == null){
+      alert('You need to login first');
+      setTimeout(() => {
+        this.router.navigate(['/']);
+      }, 10); 
+    }
+  }
 
 }
