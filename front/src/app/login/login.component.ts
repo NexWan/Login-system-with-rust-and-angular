@@ -1,5 +1,5 @@
 import { ActivatedRoute, Router } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { ConfigService } from '../config.service';
 
 @Component({
@@ -9,11 +9,16 @@ import { ConfigService } from '../config.service';
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit{
 user: any;
 password: any;
 
   constructor(private router:Router, private route: ActivatedRoute, private config: ConfigService) { }
+  ngOnInit(): void {
+    if(sessionStorage.getItem('user') != null){
+      this.router.navigate(['home']);
+    }
+  }
 
   login(){
     this.user = (<HTMLInputElement>document.getElementById('user')).value;

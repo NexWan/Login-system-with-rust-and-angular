@@ -22,6 +22,14 @@ export class HomeComponent implements OnInit {
         this.router.navigate(['/']);
       }, 10); 
     }
+    this.user = sessionStorage.getItem('user');
+  }
+
+  user: any;
+
+  logout(){
+    sessionStorage.removeItem('user');
+    this.router.navigate(['/']);
   }
 
 }
