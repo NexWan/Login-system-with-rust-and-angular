@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ConfigService } from '../config.service';
 
@@ -10,8 +10,10 @@ import { ConfigService } from '../config.service';
   styleUrl: './home.component.scss'
 })
 export class HomeComponent implements OnInit {
+  isLoading = false;
+  constructor(private route: ActivatedRoute, private router: Router, private config: ConfigService) {
 
-  constructor(private route: ActivatedRoute, private router: Router, private config: ConfigService) { }
+  }
 
   ngOnInit(): void {
     console.log(sessionStorage.getItem('user'));

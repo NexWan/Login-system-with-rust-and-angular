@@ -4,6 +4,15 @@ use sqlx::{Row};
 use actix_session::{Session};
 use crate::{db, types::{User, Response}};
 use actix_files::NamedFile;
+use actix_web::error::ParseError::Status;
+use scrypt::{
+    password_hash::{
+        rand_core::OsRng,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
+    },
+    Scrypt
+};
+use log::error;
 
 
 #[get("/")]
@@ -23,28 +32,37 @@ pub async fn manual_hello() -> impl Responder {
 
 #[post("/api/login")]
 pub async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Responder, Error> {
+    let error =  Response {
+        status: "failed".to_string(),
+        message: "User or password incorrect".to_string(),
+    };
     let username = user.username.lock().unwrap().clone();
     let password = user.password.lock().unwrap().clone();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-    let rows = sqlx::query("SELECT * FROM test_table WHERE username = $1 AND password = $2")
+    let rows = sqlx::query("SELECT username, password FROM test_table WHERE LOWER(username) = LOWER($1)")
         .bind(&username)
-        .bind(&password)
         .fetch_all(&conn)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?; //This is used to catch the error if the query fails
     if rows.len() == 0 {
-        let confirm = Response {
-            status: "error".to_string(),
-            message: "User not found".to_string(),
-        };
-        session.insert("user", "")?;
-        return Ok(web::Json(confirm))
+        return Ok(web::Json(error))
     }
+    let sql_pass = {rows[0].get::<String,usize>(1)}; // The password is obtained through the sql query, so we can compare it to it's hash
+    let parse_hash = PasswordHash::new(&sql_pass).map_err(|e| actix_web::error::ErrorInternalServerError(e));
+    if parse_hash.is_err(){
+        session.insert("user", "")?;
+        return Ok(web::Json(error))
+    }
+    let confirmation = Scrypt.verify_password(password.as_ref(), &parse_hash.unwrap()); // We compare both passwords, the original with the hashed one in the sql server to see if it matches
+    if !confirmation.is_ok() { // If it doesn't match it will show an error
+        return Ok(web::Json(error))
+    }
+    // If the previous flag wasn't checked that means it matches and we can assign it
+    let username = { rows[0].get::<String,usize>(0) };
     let confirm = Response {
         status: "success".to_string(),
-        message: "User found".to_string(),
+        message: format!("{}",username).to_string(),
     };
-    session.insert("user", &username)?;
     Ok(web::Json(confirm))
 }
 
@@ -52,10 +70,12 @@ pub async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Re
 pub async fn add_user(user: web::Json<User>, session:Session) -> Result<impl Responder, Error> {
     let username = user.username.lock().unwrap().clone();
     let password = user.password.lock().unwrap().clone();
+    let salt = SaltString::generate(&mut OsRng);
+    let pass_hash = Scrypt.hash_password(password.as_ref(), &salt).map_err(|e| actix_web::error::ErrorInternalServerError(e)).unwrap().to_string();
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     sqlx::query("INSERT INTO test_table (username, password) VALUES ($1, $2)")
         .bind(&username)
-        .bind(&password)
+        .bind(&pass_hash)
         .execute(&conn)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?; //This is used to catch the error if the query fails
