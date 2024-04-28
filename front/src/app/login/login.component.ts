@@ -1,4 +1,4 @@
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {ChangeDetectorRef, Component, OnInit} from '@angular/core';
 import { ConfigService } from '../config.service';
 import {LoadingService} from "../loading.service";
@@ -28,6 +28,10 @@ isLoading = false;
     if(sessionStorage.getItem('user') != null){
       this.router.navigate(['home']);
     }
+  }
+
+  async register(){
+    this.router.navigate(['register']);
   }
 
   async login(){

@@ -4,8 +4,8 @@
         <input type="text" class="mx-auto border-black border-2 w-44 rounded-full px-2" id="user">
         <h1 class="text-2xl py-4">Password</h1>
         <input type="password" class="mx-auto border-black border-2 w-44 rounded-full px-2" id="password">
-        <button class="my-5 border-2 w-12 mx-auto h-8 border-black rounded-full text-center" (click)="login()">OK</button>
-        <a class="text-blue-500 hover:cursor-pointer" (click)="register()">Register</a>
+        <button class="my-5 border-2 w-max px-2 mx-auto h-8 border-black 
+        rounded-full text-center hover:scale-110 transition-all duration-75" (click)="register()">Register</button>
     </div>
     <div class="w-screen top-0 left-0 flex justify-center h-full absolute bg-gray-600/50 " *ngIf="isLoading">
         <div class="w-full gap-x-2 flex justify-center items-center mx-auto">

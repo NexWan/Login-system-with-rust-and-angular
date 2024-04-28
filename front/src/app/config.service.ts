@@ -19,5 +19,11 @@ export class ConfigService {
     return x;
   }
 
+  async register(user:string, password:string){
+    this.loadingService.setLoading(true)
+    let x = this.http.post<{status:String, message:string}>(this.url + 'register', {username: user, password: password}) //We send the username and password to the backend server
+    return x;
+  }
+
   
 }

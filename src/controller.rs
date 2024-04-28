@@ -1,18 +1,19 @@
+use std::hash::Hash;
 use std::path::PathBuf;
 use actix_web::{get, post, web, Responder, Error};
 use sqlx::{Row};
 use actix_session::{Session};
 use crate::{db, types::{User, Response}};
 use actix_files::NamedFile;
-use actix_web::error::ParseError::Status;
+use log::Level::Error as OtherError;
 use scrypt::{
     password_hash::{
         rand_core::OsRng,
         PasswordHash, PasswordHasher, PasswordVerifier, SaltString
     },
-    Scrypt
+    Scrypt, Params
 };
-use log::error;
+
 
 
 #[get("/")]
@@ -31,7 +32,7 @@ pub async fn manual_hello() -> impl Responder {
 }
 
 #[post("/api/login")]
-pub async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Responder, Error> {
+pub async fn get_user(user: web::Json<User>) -> Result<impl Responder, Error> {
     let error =  Response {
         status: "failed".to_string(),
         message: "User or password incorrect".to_string(),
@@ -48,13 +49,8 @@ pub async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Re
         return Ok(web::Json(error))
     }
     let sql_pass = {rows[0].get::<String,usize>(1)}; // The password is obtained through the sql query, so we can compare it to it's hash
-    let parse_hash = PasswordHash::new(&sql_pass).map_err(|e| actix_web::error::ErrorInternalServerError(e));
-    if parse_hash.is_err(){
-        session.insert("user", "")?;
-        return Ok(web::Json(error))
-    }
-    let confirmation = Scrypt.verify_password(password.as_ref(), &parse_hash.unwrap()); // We compare both passwords, the original with the hashed one in the sql server to see if it matches
-    if !confirmation.is_ok() { // If it doesn't match it will show an error
+    let confirmation = verify_pwd(password, sql_pass.clone());
+    if !confirmation { // If it doesn't match it will show an error
         return Ok(web::Json(error))
     }
     // If the previous flag wasn't checked that means it matches and we can assign it
@@ -66,12 +62,29 @@ pub async fn get_user(user: web::Json<User>, session: Session) -> Result<impl Re
     Ok(web::Json(confirm))
 }
 
-#[post("/api/add_user")]
+
+
+pub fn encrypt(pwd: String) -> String{
+    let salt = SaltString::generate(&mut OsRng);
+    let pwd_hash = Scrypt.hash_password(pwd.as_ref(), &salt).map_err(|_e| OtherError).unwrap().to_string();
+    return pwd_hash;
+}
+
+pub fn verify_pwd(pwd: String, hash: String) -> bool{
+    let parse_hash = PasswordHash::new(&hash).map_err(|_e| OtherError);
+    if parse_hash.is_err(){
+        return false;
+    }
+    let confirmation = Scrypt.verify_password(pwd.as_ref(), &parse_hash.unwrap());
+    return confirmation.is_ok();
+}
+
+
+#[post("/api/register")]
 pub async fn add_user(user: web::Json<User>, session:Session) -> Result<impl Responder, Error> {
     let username = user.username.lock().unwrap().clone();
     let password = user.password.lock().unwrap().clone();
-    let salt = SaltString::generate(&mut OsRng);
-    let pass_hash = Scrypt.hash_password(password.as_ref(), &salt).map_err(|e| actix_web::error::ErrorInternalServerError(e)).unwrap().to_string();
+    let pass_hash = encrypt(password);
     let conn = db::get_connection().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     sqlx::query("INSERT INTO test_table (username, password) VALUES ($1, $2)")
         .bind(&username)
@@ -118,4 +131,30 @@ pub async fn logout(session: Session) -> Result<impl Responder, Error> {
 pub async fn not_found() -> Result<NamedFile, Error> {
     let path:PathBuf = "static/404.html".parse().unwrap();
     Ok(NamedFile::open(path)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+    use crate::controller::encrypt;
+    #[test]
+    fn hash(){
+        let now = Instant::now();
+        {
+            encrypt("test password".to_string());
+        }
+        let elapsed = now.elapsed();
+        println!("Elapsed: {:.2?}",elapsed);
+    }
+    #[test]
+    fn verify(){
+        let hash = encrypt("test password".to_string());
+        let now = Instant::now();
+        {
+            let confirmation = super::verify_pwd("test password".to_string(), hash);
+            assert_eq!(confirmation, true);
+        }
+        let elapsed = now.elapsed();
+        println!("Elapsed: {:.2?}",elapsed)
+    }
 }
